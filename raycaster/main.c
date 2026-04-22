@@ -22,12 +22,12 @@ float px=100, py=100, /* initial player pos */
 
 int mapX=8, mapY=8, mapS=64;
 int map[]={
-    0,1,1,1,1,1,1,1,
+    1,1,1,1,1,1,1,1,
     1,0,0,0,0,0,0,1,
+    1,0,0,0,0,1,0,1,
+    1,0,0,0,0,1,1,1,
     1,0,0,0,0,0,0,1,
-    1,0,0,0,0,0,1,1,
-    1,0,0,0,0,0,0,1,
-    1,0,0,1,0,0,0,1,
+    1,0,0,1,1,0,0,1,
     1,0,0,1,0,0,0,1,
     1,1,1,1,1,1,1,1,
 };
@@ -61,7 +61,8 @@ void draw_player() {
 
     /* line showing angle */
     /* 10 the size of player /2 to get the ray occur from center */
-    // SDL_RenderDrawLine(renderer, px+(10/2), py+(10/2), px+pdx*5, py+pdy*5);
+    SDL_SetRenderDrawColor(renderer, 100, 0, 0, 255); /* black */
+    SDL_RenderDrawLine(renderer, px+(10/2), py+(10/2), px+pdx*5, py+pdy*5);
 
 }
 
