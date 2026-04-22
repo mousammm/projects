@@ -1,0 +1,15 @@
+# Prerequisites
+- GCC compiler
+- SDL2 development libraries
+
+$ make # build
+$ ./build/chip8 <path-to-rom>
+
+# Key Mapping
+
+ 1  2  3  4 
+ Q  W  E  R 
+ A  S  D  F 
+ Z  X  C  V 
+
+# ESC: Exit the emulator
