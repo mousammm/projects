@@ -3,59 +3,57 @@
 #include <stdbool.h>
 #include <SDL2/SDL.h>
 
+#define MAP_WIDTH 10
+#define MAP_HEIGHT 10
+#define CELL_SIZE 50 /* Only for drawing */
+#define S_HEIGHT CELL_SIZE*MAP_HEIGHT
+#define S_WIDTH S_HEIGHT*2
+
 /* SDL and window */
 SDL_Window *pwindow;
 SDL_Renderer *prenderer;
-
-int cellSize=40; // pixels per grid cells
-#define MAP_WIDTH 10
-#define MAP_HEIGHT 10
-#define S_HEIGHT cellSize*MAP_HEIGHT
-#define S_WIDTH S_HEIGHT*2
 bool quit = false;
 
+/* world grid: 0-10 in X and Y */
+/* each cell is exactly 1.0 unit */
 /* map */
 int worldMap[MAP_WIDTH][MAP_HEIGHT] = {
   {1,1,1,1,1,1,1,1,1,1},
-  {1,0,0,0,0,0,0,0,0,1},
-  {1,0,0,0,0,0,0,0,0,1},
-  {1,0,0,1,1,1,0,0,0,1},
   {1,0,0,0,0,1,0,0,0,1},
   {1,0,0,0,0,1,0,0,0,1},
   {1,0,0,0,0,0,0,0,0,1},
   {1,0,0,0,0,0,0,0,0,1},
   {1,0,0,0,0,0,0,0,0,1},
+  {1,0,0,0,0,0,0,0,0,1},
+  {1,0,1,0,0,0,0,0,0,1},
+  {1,0,1,0,0,0,0,0,0,1},
   {1,1,1,1,1,1,1,1,1,1}
 };
 
-/* player */
-float px=100, /* initial x pos */
-      py=100, /* initial y pos */
-      ps=5,   /* player size */
-      moveSpeed = 5,
-      rotSpeed = 5;
-float pdirX=1.0, /* pointing right initially */
-      pdirY=0.0,
-      pplaneX=0.0,
-      pplaneY=0.66; /* field of view */
+/* Player in world units 0-MAP_WIDTH */
+float px=5.0, py=5.0, ps=0.2;   /* player size for drawing */
+
+float pdirX=1.0, pdirY=0.0;    /* where player is looking */
+float pplaneX=0.0, pplaneY=0.66; /* camera fov */
+
+/* Movement speed - in world units */
+float moveSpeed = 0.05, rotSpeed = 0.03; // 0.03 ~ 1.7 ded per frame
 
 
 void drawMap(){
-
-  for(int i=0; i<MAP_WIDTH; i++){
-    for(int j=0; j<MAP_HEIGHT; j++){
-      if (worldMap[i][j] > 0) { /* Wall */
-          SDL_Rect cell = {i * cellSize, j * cellSize, cellSize-1, cellSize-1};
+  for(int y=0; y<MAP_HEIGHT; y++){ /* Height Y axis */
+    for(int x=0; x<MAP_WIDTH; x++){ /* Width X axix */
+      if (worldMap[x][y] > 0) { /* Wall */
+          SDL_Rect cell = {y * CELL_SIZE, x * CELL_SIZE, CELL_SIZE-1, CELL_SIZE-1};
           SDL_SetRenderDrawColor(prenderer, 100, 100, 100, 255);
           SDL_RenderFillRect(prenderer, &cell);
       } else { /* empty space */
-          SDL_Rect cell = {i * cellSize, j * cellSize, cellSize-1, cellSize-1};
+          SDL_Rect cell = {y * CELL_SIZE, x * CELL_SIZE, CELL_SIZE-1, CELL_SIZE-1};
           SDL_SetRenderDrawColor(prenderer, 50, 50, 50, 255);
           SDL_RenderFillRect(prenderer, &cell);
       }
     }
   }
-
 }
 
 void gameControls(){
@@ -79,7 +77,7 @@ void gameControls(){
             {
             float oldDirX = pdirX;
             pdirX = pdirX * cos(rotSpeed) - pdirY * sin(rotSpeed);
-            pdirY = oldDirX * sin(rotSpeed) - pdirY * cos(rotSpeed);
+            pdirY = oldDirX * sin(rotSpeed) + pdirY * cos(rotSpeed);
 
             float oldPlaneX = pplaneX;
             pplaneX = pplaneX * cos(rotSpeed) - pplaneY * sin(rotSpeed);
@@ -125,7 +123,12 @@ int main() {
     drawMap(); /* map */
 
     /* player */
-    SDL_Rect player={px,py,ps,ps};
+    SDL_Rect player={
+      (int)(px * CELL_SIZE - ps * CELL_SIZE/2),  // World units to pixel
+      (int)(py * CELL_SIZE - ps * CELL_SIZE/2),
+      (int)(ps * CELL_SIZE),
+      (int)(ps * CELL_SIZE)
+    };
     SDL_SetRenderDrawColor(prenderer, 255, 0, 0, 255);
     SDL_RenderFillRect(prenderer, &player);
 
