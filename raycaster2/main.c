@@ -3,8 +3,8 @@
 #include <stdbool.h>
 #include <SDL2/SDL.h>
 
-#define S_WIDTH  960
-#define S_HEIGHT 520 
+#define S_WIDTH  640
+#define S_HEIGHT 480 
 /* SDL and window */
 SDL_Window *pwindow;
 SDL_Renderer *prenderer;
@@ -14,7 +14,7 @@ bool quit = false;
 /* each cell is exactly 1.0 unit */
 #define MAP_WIDTH 10
 #define MAP_HEIGHT 10
-#define CELL_SIZE 15 /* Only for drawing */
+#define CELL_SIZE 10 /* Only for drawing */
 int worldMap[MAP_WIDTH][MAP_HEIGHT] = {
   {1,1,1,1,1,1,1,1,1,1},
   {1,0,0,0,0,0,0,0,0,1},
@@ -37,14 +37,14 @@ float pplaneX=0.0, pplaneY=0.66; /* camera fov */
 float moveSpeed = 0.5, rotSpeed = 0.3; // 0.03 ~ 1.7 ded per frame
 
 void drawMap(){
-  for(int x=0; x<MAP_WIDTH; x++){ /* X */
-    for(int y=0; y<MAP_HEIGHT; y++){ /* Y */
+  for(int y=0; y<MAP_HEIGHT; y++){ /* X */
+    for(int x=0; x<MAP_WIDTH; x++){ /* Y */
       if (worldMap[x][y] > 0) { /* Wall */
-          SDL_Rect cell = {y * CELL_SIZE, x * CELL_SIZE, CELL_SIZE, CELL_SIZE};
+          SDL_Rect cell = {x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE};
           SDL_SetRenderDrawColor(prenderer, 100, 100, 100, 255);
           SDL_RenderFillRect(prenderer, &cell);
       } else { /* empty space */
-          SDL_Rect cell = {y * CELL_SIZE, x * CELL_SIZE, CELL_SIZE, CELL_SIZE};
+          SDL_Rect cell = {x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE};
           SDL_SetRenderDrawColor(prenderer, 200, 150, 100, 255);
           SDL_RenderFillRect(prenderer, &cell);
       }
@@ -125,11 +125,11 @@ void castRays() {
         }
 
         // Darken horizontal walls (side == 1) for shading
-        // if (side == 1) {
-        //     color.r /= 2;
-        //     color.g /= 2;
-        //     color.b /= 2;
-        // }
+        if (side == 1) {
+            color.r /= 2;
+            color.g /= 2;
+            color.b /= 2;
+        }
 
         // 10. Draw the vertical line (the wall slice)
         SDL_SetRenderDrawColor(prenderer, color.r, color.g, color.b, 255);
@@ -147,12 +147,26 @@ void gameControls(){
       case SDL_KEYDOWN:
         switch (e.key.keysym.sym) {
           case SDLK_w: /* up */
-            px += pdirX * moveSpeed;
-            py += pdirY * moveSpeed;
+            {
+            //px += pdirX * moveSpeed;
+            //py += pdirY * moveSpeed;
+            /* collitsion detc */
+            float newX = px + pdirX * moveSpeed;
+            float newY = py + pdirY * moveSpeed;
+            if (worldMap[(int)newX][(int)py] == 0) px = newX;
+            if (worldMap[(int)px][(int)newY] == 0) py = newY;
+            }
             break;
           case SDLK_s: /* down */
-            px -= pdirX * moveSpeed;
-            py -= pdirY * moveSpeed;
+            {
+            //px -= pdirX * moveSpeed;
+            //py -= pdirY * moveSpeed;
+            /* collitsion detc */
+            float newX = px - pdirX * moveSpeed;
+            float newY = py - pdirY * moveSpeed;
+            if (worldMap[(int)newX][(int)py] == 0) px = newX;
+            if (worldMap[(int)px][(int)newY] == 0) py = newY;
+            }
             break;
           case SDLK_d: /* left */
             {
@@ -204,10 +218,11 @@ int main() {
     castRays();
 
     /* draw stuff */
-    drawMap(); /* map */
+    // drawMap(); /* map */
 
     /* player */
-    SDL_Rect player={
+    /*
+     SDL_Rect player={
       (int)(px * CELL_SIZE - ps * CELL_SIZE/2),  // World units to pixel
       (int)(py * CELL_SIZE - ps * CELL_SIZE/2),
       (int)(ps * CELL_SIZE),
@@ -215,6 +230,7 @@ int main() {
     };
     SDL_SetRenderDrawColor(prenderer, 255, 0, 0, 255);
     SDL_RenderFillRect(prenderer, &player);
+    */
 
 
     /* update the screen */
