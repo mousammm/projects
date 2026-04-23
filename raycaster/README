@@ -1,0 +1,10 @@
+Raycaster in C & SDL2
+
+$ chmod +x build.sh
+$ ./build.sh
+$ ./bin/raycaster
+
+Controls 
+  W
+A   D
+  S
