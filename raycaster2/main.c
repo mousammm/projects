@@ -20,7 +20,7 @@ int worldMap[MAP_WIDTH][MAP_HEIGHT] = {
   {1,0,0,0,0,0,0,0,0,1},
   {1,0,0,0,0,0,0,0,0,1},
   {1,0,0,0,0,0,0,0,0,1},
-  {1,0,0,0,0,0,0,0,0,1},
+  {1,2,2,0,0,0,0,0,0,1},
   {1,0,0,0,0,0,0,0,0,1},
   {1,0,0,1,1,1,0,0,0,1},
   {1,0,0,0,0,0,0,0,0,1},
@@ -53,7 +53,7 @@ void drawMap(){
 }
 
 void castRays() {
-    // Loop through every column of the screen
+    // Loop through every vertical line(column) of the screen
     for (int x = 0; x < S_WIDTH; x++) {
         // 1. Calculate ray direction for this column
         float cameraX = 2.0 * x / S_WIDTH - 1.0;  // -1 (left) to +1 (right)
@@ -105,12 +105,18 @@ void castRays() {
         // 7. Calculate perpendicular distance (no fish-eye)
         float perpWallDist;
         if (side == 0)
+            //perpWallDist = (sideDistX - deltaDistX);
             perpWallDist = (sideDistX - deltaDistX);
         else
+            //perpWallDist = (sideDistY - deltaDistY);
             perpWallDist = (sideDistY - deltaDistY);
 
+        float fishEyeDist = perpWallDist / sqrtf(1.0 + cameraX * cameraX);
+        //float fishEyeDist = perpWallDist / cos(atan(cameraX * 0.66));
+        
         // 8. Calculate wall height and drawing limits
-        int lineHeight = (int)(S_HEIGHT / perpWallDist);
+        //int lineHeight = (int)(S_HEIGHT / perpWallDist);
+        int lineHeight = (int)(S_HEIGHT / fishEyeDist);
         int drawStart = -lineHeight / 2 + S_HEIGHT / 2;
         if (drawStart < 0) drawStart = 0;
         int drawEnd = lineHeight / 2 + S_HEIGHT / 2;
@@ -211,7 +217,7 @@ int main() {
     gameControls();
 
     /* set cur color + clear with the color */
-    SDL_SetRenderDrawColor(prenderer, 0, 0, 100, 50);
+    SDL_SetRenderDrawColor(prenderer, 0, 0, 0, 50);
     SDL_RenderClear(prenderer);
 
     /* dda rays */
