@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <math.h>
 #include <stdbool.h>
 #include <SDL2/SDL.h>
 
@@ -30,7 +31,9 @@ int worldMap[MAP_WIDTH][MAP_HEIGHT] = {
 /* player */
 float px=100, /* initial x pos */
       py=100, /* initial y pos */
-      ps=5;   /* player size */
+      ps=5,   /* player size */
+      moveSpeed = 5,
+      rotSpeed = 5;
 float pdirX=1.0, /* pointing right initially */
       pdirY=0.0,
       pplaneX=0.0,
@@ -65,17 +68,35 @@ void gameControls(){
       case SDL_KEYDOWN:
         switch (e.key.keysym.sym) {
           case SDLK_w: /* up */
-              py -= 10;
-              break;
+            px += pdirX * moveSpeed;
+            py += pdirY * moveSpeed;
+            break;
           case SDLK_s: /* down */
-              py += 10;
-              break;
+            px -= pdirX * moveSpeed;
+            py -= pdirY * moveSpeed;
+            break;
           case SDLK_a: /* left */
-              px -= 10;
-              break;
+            {
+            float oldDirX = pdirX;
+            pdirX = pdirX * cos(rotSpeed) - pdirY * sin(rotSpeed);
+            pdirY = oldDirX * sin(rotSpeed) - pdirY * cos(rotSpeed);
+
+            float oldPlaneX = pplaneX;
+            pplaneX = pplaneX * cos(rotSpeed) - pplaneY * sin(rotSpeed);
+            pplaneY = oldPlaneX * sin(rotSpeed) + pplaneY * cos(rotSpeed);
+            }
+            break;
           case SDLK_d: /* right */
-              px += 10;
-              break;
+            {
+            float oldDirX = pdirX;
+            pdirX = pdirX * cos(-rotSpeed) - pdirY * sin(-rotSpeed);
+            pdirY = oldDirX * sin(-rotSpeed) + pdirY * cos(-rotSpeed);
+
+            float oldPlaneX = pplaneX;
+            pplaneX = pplaneX * cos(-rotSpeed) - pplaneY * sin(-rotSpeed);
+            pplaneY = oldPlaneX * sin(-rotSpeed) + pplaneY * cos(-rotSpeed);
+            }
+            break;
           break;
       } /* e.key.keysym.sym */
       break;

@@ -3,7 +3,7 @@ set @
 
 mkdir -p bin
 
-WAR="-Wall -Wextra"
+WAR="-Wall -Wextra -lm"
 BIN="bin/raycaster"
 SDL2="`sdl2-config --cflags --libs`"
 
