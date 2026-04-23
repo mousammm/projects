@@ -1,265 +1,253 @@
-#include <SDL2/SDL_render.h>
-#include <math.h>
 #include <stdio.h>
+#include <math.h>
 #include <stdbool.h>
 #include <SDL2/SDL.h>
 
-#define PI 3.1415926535
-#define P2 PI/2
-#define P3 3*P2
-#define DR  0.0174533 /* one degree in radian */
-
-SDL_Window* window;
-SDL_Renderer* renderer;
-#define WIDTH 1024
-#define HEIGHT 512
-
+#define S_WIDTH  640
+#define S_HEIGHT 480 
+/* SDL and window */
+SDL_Window *pwindow;
+SDL_Renderer *prenderer;
 bool quit = false;
-float px=100, py=100, /* initial player pos */
-    vel=5,  /* player speed */
-    pdx, pdy, /* player delta x snd y */
-    pa; /* player angle */
 
-int mapX=8, mapY=8, mapS=64;
-int map[]={
-    1,1,1,1,1,1,1,1,
-    1,0,0,0,0,0,0,1,
-    1,0,0,0,0,1,0,1,
-    1,0,0,0,0,1,1,1,
-    1,0,0,0,0,0,0,1,
-    1,0,0,1,1,0,0,1,
-    1,0,0,1,0,0,0,1,
-    1,1,1,1,1,1,1,1,
+/* world grid: 0-10 in X and Y */
+/* each cell is exactly 1.0 unit */
+#define MAP_WIDTH 10
+#define MAP_HEIGHT 10
+#define CELL_SIZE 10 /* Only for drawing */
+int worldMap[MAP_WIDTH][MAP_HEIGHT] = {
+  {1,1,1,1,1,1,1,1,1,1},
+  {1,0,0,0,0,0,0,0,0,1},
+  {1,0,0,0,0,0,0,0,0,1},
+  {1,0,0,0,0,0,0,0,0,1},
+  {1,2,2,0,0,0,0,0,0,1},
+  {1,0,0,0,0,0,0,0,0,1},
+  {1,0,0,1,1,1,0,0,0,1},
+  {1,0,0,0,0,0,0,0,0,1},
+  {1,0,0,0,0,0,0,0,0,1},
+  {1,1,1,1,1,1,1,1,1,1}
 };
 
-void draw_map() {
-    for (int y=0; y<mapY; y++) {
-        for (int x=0; x<mapX; x++) {
+/* Player in world units 0-MAP_WIDTH */
+float px=5.0, py=5.0, ps=0.2;   /* player size for drawing */
+/* cmera */
+float pdirX=1.0, pdirY=0.0;    /* where player is looking */
+float pplaneX=0.0, pplaneY=0.66; /* camera fov */
+/* Movement speed - in world units */
+float moveSpeed = 0.05, rotSpeed = 0.05; // 0.03 ~ 1.7 ded per frame
 
-            if (map[y*mapX+x]==1) { /* walls colors */
-                SDL_SetRenderDrawColor(renderer, 200, 200, 200, 200); /* white */
-            } else { /* empty spcae colors */
-                SDL_SetRenderDrawColor(renderer, 100, 0, 100, 255); /* black */
-            }
-
-            /* x,y pos for all ele of map array */
-            int xo=x*mapS;
-            int yo=y*mapS;
-
-            /* draw the squares */
-            SDL_Rect rect = {xo, yo, mapS-1, mapS-1};
-            SDL_RenderFillRect(renderer, &rect);
-        }
+void drawMap(){
+  for(int y=0; y<MAP_HEIGHT; y++){ /* X */
+    for(int x=0; x<MAP_WIDTH; x++){ /* Y */
+      if (worldMap[x][y] > 0) { /* Wall */
+          SDL_Rect cell = {x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE};
+          SDL_SetRenderDrawColor(prenderer, 100, 100, 100, 255);
+          SDL_RenderFillRect(prenderer, &cell);
+      } else { /* empty space */
+          SDL_Rect cell = {x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE};
+          SDL_SetRenderDrawColor(prenderer, 200, 150, 100, 255);
+          SDL_RenderFillRect(prenderer, &cell);
+      }
     }
+  }
 }
 
-void draw_player() {
-    /* player */
-    SDL_Rect rect = {px, py, 10, 10};
-    SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
-    SDL_RenderFillRect(renderer, &rect);
+void castRays() {
+    // Loop through every vertical line(column) of the screen
+    for (int x = 0; x < S_WIDTH; x++) {
+        // 1. Calculate ray direction for this column
+        float cameraX = 2.0 * x / S_WIDTH - 1.0;  // -1 (left) to +1 (right)
+        float rayDirX = pdirX + pplaneX * cameraX;
+        float rayDirY = pdirY + pplaneY * cameraX;
 
-    /* line showing angle */
-    /* 10 the size of player /2 to get the ray occur from center */
-    SDL_SetRenderDrawColor(renderer, 100, 0, 0, 255); /* black */
-    SDL_RenderDrawLine(renderer, px+(10/2), py+(10/2), px+pdx*5, py+pdy*5);
+        // 2. Which grid cell the ray starts in
+        int mapX = (int)px;
+        int mapY = (int)py;
 
-}
+        // 3. Delta distances (how far to travel to cross a grid line)
+        float deltaDistX = fabs(1.0 / rayDirX);
+        float deltaDistY = fabs(1.0 / rayDirY);
 
-/* return dist btw the player and ray endpoint */
-float dist(float ax, float ay, float bx, float by, float ang) {
-    return (sqrtf((bx-ax)*(bx-ax) + (by-ay)*(by-ay)));
-}
+        // 4. Step direction (+1 or -1)
+        int stepX = (rayDirX < 0) ? -1 : 1;
+        int stepY = (rayDirY < 0) ? -1 : 1;
 
+        // 5. Calculate initial side distances
+        float sideDistX, sideDistY;
 
-/* dda algo */
-void draw_ray() {
-    /* mapX = 8; mapY=8 */
-    int r, mx, my, mp, dof;
-    float rx, ry, ra, xo, yo, disT;
-    ra = pa-DR*360; /* rays angle = players angle */
-    if (ra<0) {
-        ra+=2*PI;
-        if (ra>2*PI) {
-            ra-=2*PI;
-        }
-    }
+        if (rayDirX < 0)
+            sideDistX = (px - mapX) * deltaDistX;
+        else
+            sideDistX = (mapX + 1.0 - px) * deltaDistX;
 
+        if (rayDirY < 0)
+            sideDistY = (py - mapY) * deltaDistY;
+        else
+            sideDistY = (mapY + 1.0 - py) * deltaDistY;
 
-    for (r=0; r<360; r++) {
-        /* check horizontal line */
-        dof=0;
-        float disH=100000,hx=px,hy=py;
+        // 6. DDA: Walk through grid until hitting a wall
+        int hit = 0;
+        int side = 0;  // 0 = vertical wall, 1 = horizontal wall
 
-        float aTan=-1/tan(ra);
-        if (ra>PI) { /* ray loking down */
-            ry = (((int)py>>6)<<6)-0.0001;
-            rx=(py-ry)*aTan+px;
-            yo=-64;
-            xo=-yo*aTan;
-        }
-        if (ra<PI) { /* ray loking up */
-            ry = (((int)py>>6)<<6)+64;
-            rx=(py-ry)*aTan+px;
-            yo=64;
-            xo=-yo*aTan;
-        }
-        if (ra==0 || ra==PI) { /* ray looking straight left or right */
-            rx=px; ry=py;
-            dof=8;
-        }
-        while (dof<8) {
-            mx=(int)(rx)>>6; my=(int)(ry)>>6; mp=my*8+mx;
-            if (mp>0 && mp<8*8 && map[mp]==1) { /* hit the wall */ 
-                hx=rx;
-                hy=ry;
-                disH=dist(px, py, hx, hy, ra);
-                dof=8;
+        while (!hit) {
+            if (sideDistX < sideDistY) {
+                sideDistX += deltaDistX;
+                mapX += stepX;
+                side = 0;
+            } else {
+                sideDistY += deltaDistY;
+                mapY += stepY;
+                side = 1;
             }
-            else { /* next line */
-                rx+=xo;
-                ry+=yo;
-                dof+=1;
-            }
-        }
-        /* draw the horizontal line */
-        // SDL_RenderDrawLine(renderer, px+(10/2), py+(10/2), rx, ry);
-
-        /* check vertical line */
-        dof=0;
-        float disV = 100000,vx=px,vy=py;
-
-        float nTan=-tan(ra);
-        if (ra>P2 && ra<P3) { /* ray left */
-            rx = (((int)px>>6)<<6)-0.0001;
-            ry=(px-rx)*nTan+py;
-            xo=-64;
-            yo=-xo*nTan;
-        }
-        if (ra<P2 || ra>P3) { /* ray loking right */
-            rx = (((int)px>>6)<<6)+64;
-            ry=(px-rx)*nTan+py;
-            xo=64;
-            yo=-xo*nTan;
-        }
-        if (ra==0 || ra==PI) { /* ray looking straight up or down*/
-            rx=px; ry=py;
-            dof=8;
-        }
-        while (dof<8) {
-            mx=(int)(rx)>>6; my=(int)(ry)>>6; mp=my*8+mx;
-            if (mp>0 && mp<8*8 && map[mp]==1) { /* hit the wall */ 
-                vx=rx;
-                vy=ry;
-                disV=dist(px, py, vx, vy, ra);
-                dof=8;
-            }
-            else { /* next line */
-                rx+=xo;
-                ry+=yo;
-                dof+=1;
-            }
+            if (worldMap[mapX][mapY] > 0) hit = 1;
         }
 
-        /* take the shortest betw horizontal and vetical  */
-        if (disV<disH) { rx=vx; ry=vy; disT=disV; }
-        if (disH<disV) { rx=hx; ry=hy; disT=disH; }
-        /* draw the horizontal line */
-        SDL_RenderDrawLine(renderer, px+(10/2), py+(10/2), rx, ry);
+        // 7. Calculate perpendicular distance (no fish-eye)
+        float perpWallDist;
+        if (side == 0)
+            //perpWallDist = (sideDistX - deltaDistX);
+            perpWallDist = (sideDistX - deltaDistX);
+        else
+            //perpWallDist = (sideDistY - deltaDistY);
+            perpWallDist = (sideDistY - deltaDistY);
 
-        /* draw the walls */
-        float lineH=(mapS*320)/disT;
-        if (lineH>320) { lineH=320; }
-        float lineO=160-lineH/2;
-        SDL_RenderDrawLine(renderer, r*2+530, lineO, r*2+530, lineH+lineO);
-
-        /* increase 1radian evrythime */
-        ra+=DR;
-        if (ra<0) {
-            ra+=2*PI; if (ra>2*PI) { ra-=2*PI; }
-        }
-
-    }
-}
-
-void sdl_poll_event() {
-    SDL_Event e;
-    while (SDL_PollEvent(&e) != 0) {
-        switch (e.type) {
-            case SDL_QUIT:
-                quit = true;
-                break;
-            case SDL_KEYUP:
-                switch (e.key.keysym.sym) {
-                    case SDLK_ESCAPE:
-                        quit = true;
-                        break;
-                } // keysym.sym
-                break;
-            case SDL_KEYDOWN:
-                switch (e.key.keysym.sym) {
-                    case SDLK_w: /* up */
-                        // py -= vel;
-                        px+=pdx; py+=pdy;
-                        break;
-                    case SDLK_s: /* down */
-                        // py += vel;
-                        px-=pdx; py-=pdy;
-                        break;
-                    case SDLK_a: /* left */
-                        // px -= vel;
-                        pa-=0.1;
-                        if (pa<0) { pa+=2*PI; }
-                        pdx=cos(pa)*5;
-                        pdy=sin(pa)*5;
-                        break;
-                    case SDLK_d: /* right */
-                        // px += vel;
-                        pa+=0.1;
-                        if (pa>2*PI) { pa-=2*PI; }
-                        pdx=cos(pa)*5;
-                        pdy=sin(pa)*5;
-                        break;
-                } // keysym.sym
-                break;
+        float fishEyeDist = perpWallDist / sqrtf(1.0 + cameraX * cameraX);
+        //float fishEyeDist = perpWallDist / cos(atan(cameraX * 0.66));
         
-        } // e.type
-    } // while 
-}
+        // 8. Calculate wall height and drawing limits
+        //int lineHeight = (int)(S_HEIGHT / perpWallDist);
+        int lineHeight = (int)(S_HEIGHT / fishEyeDist);
+        int drawStart = -lineHeight / 2 + S_HEIGHT / 2;
+        if (drawStart < 0) drawStart = 0;
+        int drawEnd = lineHeight / 2 + S_HEIGHT / 2;
+        if (drawEnd >= S_HEIGHT) drawEnd = S_HEIGHT - 1;
 
-int main(int argc, char **argv) {
+        // 9. Choose color based on wall type
+        SDL_Color color;
+        if (worldMap[mapX][mapY] == 1) {
+            color = (SDL_Color){255, 0, 0, 255};  // Red wall
+        } else {
+            color = (SDL_Color){0, 255, 0, 255};  // Green wall
+        }
 
-    /* Sdl init */    
-    SDL_Init(SDL_INIT_VIDEO);
-    window = SDL_CreateWindow("Raycaster",
-            SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-            WIDTH, HEIGHT, SDL_WINDOW_SHOWN);
-    renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
+        // Darken horizontal walls (side == 1) for shading
+        if (side == 1) {
+            color.r /= 2;
+            color.g /= 2;
+            color.b /= 2;
+        }
 
-    /* main loooop */
-    while (!quit) {
-        sdl_poll_event(); /* handle events */
-
-        /* clear once */
-        /* dont need to do this in draw fun */
-        SDL_SetRenderDrawColor(renderer, 0, 30, 30, 50);  /* background color */
-        SDL_RenderClear(renderer);
-
-        /* draw */
-        draw_map();
-        draw_player();
-        draw_ray();
-
-        /* push everything to screen at once */
-        /* dont need to do this in draw fun */
-        SDL_RenderPresent(renderer);
-
-        SDL_Delay(10);/* 60fps */ 
+        // 10. Draw the vertical line (the wall slice)
+        SDL_SetRenderDrawColor(prenderer, color.r, color.g, color.b, 255);
+        SDL_RenderDrawLine(prenderer, x, drawStart, x, drawEnd);
     }
-
-    /* Destroy */
-    SDL_DestroyRenderer(renderer);
-    SDL_DestroyWindow(window);
-
-    return 0;
 }
+
+void gameControls(){
+  SDL_Event e;
+  while (SDL_PollEvent(&e) != 0) {
+    switch (e.type) {
+      case SDL_QUIT:
+        quit = true;
+        break;
+      case SDL_KEYDOWN:
+        switch (e.key.keysym.sym) {
+          case SDLK_w: /* up */
+            {
+            //px += pdirX * moveSpeed;
+            //py += pdirY * moveSpeed;
+            /* collitsion detc */
+            float newX = px + pdirX * moveSpeed;
+            float newY = py + pdirY * moveSpeed;
+            if (worldMap[(int)newX][(int)py] == 0) px = newX;
+            if (worldMap[(int)px][(int)newY] == 0) py = newY;
+            }
+            break;
+          case SDLK_s: /* down */
+            {
+            //px -= pdirX * moveSpeed;
+            //py -= pdirY * moveSpeed;
+            /* collitsion detc */
+            float newX = px - pdirX * moveSpeed;
+            float newY = py - pdirY * moveSpeed;
+            if (worldMap[(int)newX][(int)py] == 0) px = newX;
+            if (worldMap[(int)px][(int)newY] == 0) py = newY;
+            }
+            break;
+          case SDLK_d: /* left */
+            {
+            float oldDirX = pdirX;
+            pdirX = pdirX * cos(rotSpeed) - pdirY * sin(rotSpeed);
+            pdirY = oldDirX * sin(rotSpeed) + pdirY * cos(rotSpeed);
+
+            float oldPlaneX = pplaneX;
+            pplaneX = pplaneX * cos(rotSpeed) - pplaneY * sin(rotSpeed);
+            pplaneY = oldPlaneX * sin(rotSpeed) + pplaneY * cos(rotSpeed);
+            }
+            break;
+          case SDLK_a: /* right */
+            {
+            float oldDirX = pdirX;
+            pdirX = pdirX * cos(-rotSpeed) - pdirY * sin(-rotSpeed);
+            pdirY = oldDirX * sin(-rotSpeed) + pdirY * cos(-rotSpeed);
+
+            float oldPlaneX = pplaneX;
+            pplaneX = pplaneX * cos(-rotSpeed) - pplaneY * sin(-rotSpeed);
+            pplaneY = oldPlaneX * sin(-rotSpeed) + pplaneY * cos(-rotSpeed);
+            }
+            break;
+          break;
+      } /* e.key.keysym.sym */
+      break;
+    } /* switch e.type */
+  }
+}
+
+int main() {
+  /* Init SDL */
+  SDL_Init(SDL_INIT_VIDEO);
+  pwindow = SDL_CreateWindow("raycaster",
+      SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
+      S_WIDTH, S_HEIGHT, SDL_WINDOW_SHOWN);
+  prenderer = SDL_CreateRenderer(pwindow, -1, SDL_RENDERER_ACCELERATED);
+
+  /* game loop */
+  while(!quit) {
+    /* handle input */
+    gameControls();
+
+    /* set cur color + clear with the color */
+    SDL_SetRenderDrawColor(prenderer, 0, 0, 0, 50);
+    SDL_RenderClear(prenderer);
+
+    /* dda rays */
+    castRays();
+
+    /* draw stuff */
+    // drawMap(); /* map */
+
+    /* player */
+    /*
+     SDL_Rect player={
+      (int)(px * CELL_SIZE - ps * CELL_SIZE/2),  // World units to pixel
+      (int)(py * CELL_SIZE - ps * CELL_SIZE/2),
+      (int)(ps * CELL_SIZE),
+      (int)(ps * CELL_SIZE)
+    };
+    SDL_SetRenderDrawColor(prenderer, 255, 0, 0, 255);
+    SDL_RenderFillRect(prenderer, &player);
+    */
+
+
+    /* update the screen */
+    SDL_RenderPresent(prenderer);
+  }
+
+  /* destroy */
+  SDL_DestroyRenderer(prenderer);
+  SDL_DestroyWindow(pwindow);
+  SDL_Quit();
+
+  return 0;
+}
+
