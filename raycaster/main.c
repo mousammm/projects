@@ -3,8 +3,8 @@
 #include <stdbool.h>
 #include <SDL2/SDL.h>
 
-#define S_WIDTH  640
-#define S_HEIGHT 480 
+#define S_WIDTH  640*2.5
+#define S_HEIGHT 480*1.5
 /* SDL and window */
 SDL_Window *pwindow;
 SDL_Renderer *prenderer;
@@ -111,8 +111,8 @@ void castRays() {
             //perpWallDist = (sideDistY - deltaDistY);
             perpWallDist = (sideDistY - deltaDistY);
 
-        float fishEyeDist = perpWallDist / sqrtf(1.0 + cameraX * cameraX);
-        //float fishEyeDist = perpWallDist / cos(atan(cameraX * 0.66));
+        //float fishEyeDist = perpWallDist / sqrtf(1.0 + cameraX * cameraX);
+        float fishEyeDist = perpWallDist / cos(atan(cameraX * 0.66));
         
         // 8. Calculate wall height and drawing limits
         //int lineHeight = (int)(S_HEIGHT / perpWallDist);
@@ -224,10 +224,9 @@ int main() {
     castRays();
 
     /* draw stuff */
-    // drawMap(); /* map */
+    drawMap(); /* map */
 
     /* player */
-    /*
      SDL_Rect player={
       (int)(px * CELL_SIZE - ps * CELL_SIZE/2),  // World units to pixel
       (int)(py * CELL_SIZE - ps * CELL_SIZE/2),
@@ -236,8 +235,6 @@ int main() {
     };
     SDL_SetRenderDrawColor(prenderer, 255, 0, 0, 255);
     SDL_RenderFillRect(prenderer, &player);
-    */
-
 
     /* update the screen */
     SDL_RenderPresent(prenderer);
