@@ -1,3 +1,5 @@
+#include <SDL2/SDL_events.h>
+#include <SDL2/SDL_stdinc.h>
 #include <stdio.h>
 #include <math.h>
 #include <stdbool.h>
@@ -163,6 +165,7 @@ void gameControls(){
             if (worldMap[(int)px][(int)newY] == 0) py = newY;
             }
             break;
+
           case SDLK_s: /* down */
             {
             //px -= pdirX * moveSpeed;
